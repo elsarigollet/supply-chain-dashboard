@@ -10,8 +10,7 @@ pip install -r requirements.txt
 streamlit run dashboard.py
 ```
 
-The app reads data from `data/supply_chain_data.csv`. That file is not tracked in git (see
-`.gitignore`) — place your own copy at that path before running the dashboard.
+The app reads data from `data/supply_chain_data.csv`, tracked in this repo.
 
 ## KPIs
 

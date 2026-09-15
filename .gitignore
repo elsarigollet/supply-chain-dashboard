@@ -1,6 +1,3 @@
-# Raw data
-data/supply_chain_data.csv
-
 # Python
 __pycache__/
 *.pyc
