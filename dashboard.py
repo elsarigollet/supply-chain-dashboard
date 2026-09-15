@@ -332,7 +332,7 @@ def render_alert_banner(df: pd.DataFrame, kpis: dict) -> None:
         affected = pd.concat([stockout_rows, low_stock_rows])[
             ["SKU", "Product type", "Supplier name", "Stock levels", "Availability"]
         ].sort_values("Stock levels")
-        st.dataframe(affected, use_container_width=True, hide_index=True)
+        st.dataframe(affected, width='stretch', hide_index=True)
 
 
 # ---------------------------------------------------------------------------
@@ -409,7 +409,7 @@ def chart_shipping_cost_by_carrier(df: pd.DataFrame) -> go.Figure:
 
 def render_raw_data_explorer(df: pd.DataFrame) -> None:
     with st.expander("Raw data explorer"):
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.dataframe(df, width='stretch', hide_index=True)
         st.download_button(
             "Download filtered data as CSV",
             data=df.to_csv(index=False).encode("utf-8"),
@@ -443,21 +443,21 @@ def main() -> None:
 
     col1, col2 = st.columns(2)
     with col1:
-        st.plotly_chart(chart_stock_levels_by_sku(df), use_container_width=True)
+        st.plotly_chart(chart_stock_levels_by_sku(df), width='stretch')
     with col2:
-        st.plotly_chart(chart_lead_time_by_supplier(df), use_container_width=True)
+        st.plotly_chart(chart_lead_time_by_supplier(df), width='stretch')
 
     col3, col4 = st.columns(2)
     with col3:
-        st.plotly_chart(chart_defect_rate_by_supplier(df), use_container_width=True)
+        st.plotly_chart(chart_defect_rate_by_supplier(df), width='stretch')
     with col4:
-        st.plotly_chart(chart_revenue_by_category(df), use_container_width=True)
+        st.plotly_chart(chart_revenue_by_category(df), width='stretch')
 
     col5, col6 = st.columns(2)
     with col5:
-        st.plotly_chart(chart_production_vs_sold(df), use_container_width=True)
+        st.plotly_chart(chart_production_vs_sold(df), width='stretch')
     with col6:
-        st.plotly_chart(chart_shipping_cost_by_carrier(df), use_container_width=True)
+        st.plotly_chart(chart_shipping_cost_by_carrier(df), width='stretch')
 
     render_raw_data_explorer(df)
 
