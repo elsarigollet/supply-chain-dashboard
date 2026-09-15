@@ -215,9 +215,10 @@ def inject_css() -> None:
             margin-bottom: 1rem;
         }}
         .ticker-track {{
-            display: inline-flex;
+            display: inline-block;
             white-space: nowrap;
-            animation: ticker-scroll 22s linear infinite;
+            padding-left: 100%;
+            animation: ticker-scroll 15s linear infinite;
         }}
         .ticker-item {{
             display: inline-block;
@@ -228,7 +229,7 @@ def inject_css() -> None:
         }}
         @keyframes ticker-scroll {{
             0% {{ transform: translateX(0); }}
-            100% {{ transform: translateX(-50%); }}
+            100% {{ transform: translateX(-100%); }}
         }}
         /* --- Chart cards — kept as boxes, restyled to the light theme --- */
         div[data-testid="stPlotlyChart"] {{
@@ -236,6 +237,11 @@ def inject_css() -> None:
             border-radius: 12px;
             padding: 0.6rem;
             border: 1px solid #E5E7EB;
+            box-sizing: border-box;
+            overflow: hidden;
+        }}
+        div[data-testid="stPlotlyChart"] > div {{
+            max-width: 100%;
         }}
         div[data-testid="stExpander"] {{
             background-color: {COLOR_SURFACE};
@@ -455,7 +461,7 @@ def render_stockout_ticker(df: pd.DataFrame) -> None:
     st.markdown(
         f"""
         <div class="ticker-wrap">
-            <div class="ticker-track">{ticker_text}{ticker_text}</div>
+            <div class="ticker-track">{ticker_text}</div>
         </div>
         """,
         unsafe_allow_html=True,
