@@ -1,5 +1,7 @@
 """Supply Chain Analytics — a Streamlit dashboard for supply chain KPIs and trends."""
 
+from typing import Optional
+
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -138,7 +140,6 @@ def inject_css() -> None:
             font-size: 1.05rem;
             margin: 0.4rem 0 0.6rem 0;
         }}
-
         /* --- Stat tiles (KPI row) — no boxes, mixed visual forms --- */
         .stat-tile {{
             padding: 0.2rem 0.6rem;
@@ -182,30 +183,19 @@ def inject_css() -> None:
             height: 8px;
             border-radius: 999px;
         }}
-        .badge-circle {{
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.4rem;
-            font-weight: 800;
-            color: #FFFFFF;
-            flex-shrink: 0;
-        }}
-        .badge-row {{
-            display: flex;
-            align-items: center;
-            gap: 0.7rem;
-        }}
-        .badge-caption {{
-            color: {COLOR_MUTED};
+        .stat-caption {{
             font-size: 0.78rem;
             font-weight: 600;
+            margin-top: 0.15rem;
         }}
-
         /* --- Alert pills --- */
+        .alert-pills-wrap {{
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.6rem;
+            margin-bottom: 0.6rem;
+        }}
         .alert-pill {{
             display: inline-flex;
             align-items: center;
@@ -214,9 +204,32 @@ def inject_css() -> None:
             border-radius: 999px;
             font-size: 0.85rem;
             font-weight: 600;
-            margin: 0 0.5rem 0.5rem 0;
         }}
-
+        /* --- Scrolling stockout ticker --- */
+        .ticker-wrap {{
+            width: 100%;
+            overflow: hidden;
+            background-color: {COLOR_CRITICAL}14;
+            border-radius: 999px;
+            padding: 0.55rem 0;
+            margin-bottom: 1rem;
+        }}
+        .ticker-track {{
+            display: inline-flex;
+            white-space: nowrap;
+            animation: ticker-scroll 22s linear infinite;
+        }}
+        .ticker-item {{
+            display: inline-block;
+            padding-right: 3rem;
+            color: {COLOR_CRITICAL};
+            font-weight: 600;
+            font-size: 0.85rem;
+        }}
+        @keyframes ticker-scroll {{
+            0% {{ transform: translateX(0); }}
+            100% {{ transform: translateX(-50%); }}
+        }}
         /* --- Chart cards — kept as boxes, restyled to the light theme --- */
         div[data-testid="stPlotlyChart"] {{
             background-color: {COLOR_SURFACE};
@@ -319,7 +332,14 @@ def render_meter_tile(col, icon: str, display_value: str, label: str, fill_pct: 
         )
 
 
-def render_plain_tile(col, icon: str, display_value: str, label: str, accent_color: str) -> None:
+def render_plain_tile(
+    col, icon: str, display_value: str, label: str, accent_color: str, caption: Optional[str] = None
+) -> None:
+    caption_html = (
+        f'<div class="stat-caption" style="color:{accent_color};">{caption}</div>'
+        if caption
+        else ""
+    )
     with col:
         st.markdown(
             f"""
@@ -328,24 +348,7 @@ def render_plain_tile(col, icon: str, display_value: str, label: str, accent_col
                 <div class="stat-value">{display_value}</div>
                 <div class="stat-accent" style="background-color:{accent_color};"></div>
                 <div class="stat-label">{label}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-
-def render_badge_tile(col, count: int, label: str, caption: str, color: str) -> None:
-    with col:
-        st.markdown(
-            f"""
-            <div class="stat-tile">
-                <div class="badge-row">
-                    <div class="badge-circle" style="background-color:{color};">{count}</div>
-                    <div>
-                        <div class="stat-label" style="margin-top:0;">{label}</div>
-                        <div class="badge-caption" style="color:{color};">{caption}</div>
-                    </div>
-                </div>
+                {caption_html}
             </div>
             """,
             unsafe_allow_html=True,
@@ -378,12 +381,13 @@ def render_kpi_row(kpis: dict) -> None:
 
     stockouts = kpis["stockouts"]
     stockout_color = COLOR_CRITICAL if stockouts > 0 else COLOR_GOOD
-    render_badge_tile(
+    render_plain_tile(
         cols[2],
-        stockouts,
+        "🚨",
+        f"{stockouts}",
         "Stockouts",
-        "Action needed" if stockouts > 0 else "All clear",
         stockout_color,
+        caption="Action needed" if stockouts > 0 else "All clear",
     )
 
     render_plain_tile(
@@ -429,12 +433,33 @@ def render_alert_banner(df: pd.DataFrame) -> None:
             f"⚠️ {len(low_stock_rows)} SKU(s) low stock (&lt; {LOW_STOCK_THRESHOLD} units)</span>"
         )
 
-    st.markdown("".join(pills), unsafe_allow_html=True)
+    st.markdown(f'<div class="alert-pills-wrap">{"".join(pills)}</div>', unsafe_allow_html=True)
     with st.expander("View affected SKUs"):
         affected = pd.concat([stockout_rows, low_stock_rows])[
             ["SKU", "Product type", "Supplier name", "Stock levels", "Availability"]
         ].sort_values("Stock levels")
         st.dataframe(affected, width="stretch", hide_index=True)
+
+
+def render_stockout_ticker(df: pd.DataFrame) -> None:
+    stockout_rows = df[df["Stock levels"] <= STOCKOUT_STOCK_LEVEL]
+    if stockout_rows.empty:
+        return
+
+    items = [
+        f"🚨 {row['SKU']} — {row['Product type']} ({row['Supplier name']}) out of stock"
+        for _, row in stockout_rows.iterrows()
+    ]
+    ticker_text = "".join(f'<span class="ticker-item">{item}</span>' for item in items)
+
+    st.markdown(
+        f"""
+        <div class="ticker-wrap">
+            <div class="ticker-track">{ticker_text}{ticker_text}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -530,14 +555,16 @@ def main() -> None:
     inject_css()
 
     raw_df = load_data(DATA_PATH)
-    render_header()
-
     product_types, suppliers = render_sidebar(raw_df)
     df = filter_data(raw_df, product_types, suppliers)
 
     if df.empty:
+        render_header()
         st.warning("No data matches the selected filters.")
         return
+
+    render_stockout_ticker(df)
+    render_header()
 
     kpis = compute_kpis(df)
     render_kpi_row(kpis)
