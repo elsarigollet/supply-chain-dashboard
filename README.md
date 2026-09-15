@@ -15,7 +15,8 @@ The app reads data from `data/supply_chain_data.csv`. That file is not tracked i
 
 ## KPIs
 
-The dashboard surfaces five headline metrics, each colored green/red against a threshold so
+The dashboard surfaces five headline metrics as a mix of meters, a status badge, and plain
+stat tiles (rather than uniform boxes), each colored green/mustard/red against a threshold so
 issues are visible at a glance:
 
 - **Availability Rate** — average of the `Availability` column across all SKUs. Green above
@@ -49,8 +50,9 @@ CSV download button.
 
 ## Filters
 
-The sidebar lets you filter the entire dashboard by **product type** and **supplier**, and
-shows quick dataset stats (total SKUs, suppliers, product types).
+The sidebar lets you filter the entire dashboard by **product type** and **supplier** via
+checkboxes (all selected by default), and shows quick dataset stats (total SKUs, suppliers,
+product types).
 
 ## Tech
 

@@ -1,7 +1,5 @@
 """Supply Chain Analytics — a Streamlit dashboard for supply chain KPIs and trends."""
 
-from datetime import date
-
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -13,17 +11,25 @@ import streamlit as st
 
 DATA_PATH = "data/supply_chain_data.csv"
 
-# Palette
-COLOR_BLACK = "#0A0A0A"
-COLOR_WHITE = "#FFFFFF"
-COLOR_VIOLET = "#7C3AED"
-COLOR_VIOLET_SOFT = "#EDE9FE"
-COLOR_CARD = "#141414"
-COLOR_GREEN = "#22C55E"
-COLOR_RED = "#EF4444"
-COLOR_GRAY_TEXT = "#A1A1AA"
+# Palette — white surface, bleu canard (teal) + jaune moutarde (mustard) accents
+COLOR_BG = "#FFFFFF"
+COLOR_SURFACE = "#F4F8F8"
+COLOR_INK = "#1A1A1A"
+COLOR_MUTED = "#6B7280"
 
-CHART_COLORWAY = ["#7C3AED", "#A78BFA", "#C4B5FD", "#EDE9FE", "#5B21B6", "#DDD6FE"]
+COLOR_TEAL = "#0E7C86"
+COLOR_TEAL_DARK = "#0B5E66"
+COLOR_TEAL_SOFT = "#DCEEF0"
+COLOR_MUSTARD = "#DDA51C"
+COLOR_MUSTARD_SOFT = "#FBEED2"
+COLOR_CHARCOAL = "#4B5563"
+
+# Status colors (reserved — never reused as brand/categorical colors)
+COLOR_GOOD = "#0CA30C"
+COLOR_WARNING = "#DDA51C"
+COLOR_CRITICAL = "#D03B3B"
+
+CHART_COLORWAY = [COLOR_TEAL, COLOR_MUSTARD, COLOR_CHARCOAL]
 
 # KPI thresholds
 AVAILABILITY_HIGH = 70
@@ -32,6 +38,7 @@ STOCK_COVERAGE_HIGH_DAYS = 7
 STOCK_COVERAGE_LOW_DAYS = 3
 DEFECT_RATE_HIGH_PCT = 2.5
 DEFECT_RATE_LOW_PCT = 1.0
+DEFECT_RATE_METER_MAX = 2 * DEFECT_RATE_HIGH_PCT  # meter scale ceiling
 
 # Business assumptions
 DAYS_IN_PERIOD = 365  # "Number of products sold" is treated as annual demand for stock-coverage math
@@ -74,19 +81,19 @@ def compute_kpis(df: pd.DataFrame) -> dict:
     }
 
 
-def kpi_color(value: float, high: float, low: float, invert: bool = False) -> str:
-    """Green above `high`, red below `low`, violet in between. `invert` flips the direction."""
+def status_color(value: float, high: float, low: float, invert: bool = False) -> str:
+    """Good above `high`, critical below `low`, warning in between. `invert` flips the direction."""
     if invert:
         if value < low:
-            return COLOR_GREEN
+            return COLOR_GOOD
         if value > high:
-            return COLOR_RED
-        return COLOR_VIOLET
+            return COLOR_CRITICAL
+        return COLOR_WARNING
     if value > high:
-        return COLOR_GREEN
+        return COLOR_GOOD
     if value < low:
-        return COLOR_RED
-    return COLOR_VIOLET
+        return COLOR_CRITICAL
+    return COLOR_WARNING
 
 
 # ---------------------------------------------------------------------------
@@ -103,82 +110,124 @@ def inject_css() -> None:
             font-family: 'Inter', sans-serif;
         }}
         .stApp {{
-            background-color: {COLOR_BLACK};
-            color: {COLOR_WHITE};
+            background-color: {COLOR_BG};
+            color: {COLOR_INK};
         }}
         section[data-testid="stSidebar"] {{
-            background-color: {COLOR_BLACK};
-            border-right: 1px solid #262626;
+            background-color: {COLOR_SURFACE};
+            border-right: 1px solid #E5E7EB;
         }}
         section[data-testid="stSidebar"] * {{
-            color: {COLOR_WHITE};
+            color: {COLOR_INK};
+        }}
+        section[data-testid="stSidebar"] h3 {{
+            color: {COLOR_TEAL_DARK};
         }}
         h1, h2, h3, h4, h5, h6 {{
-            color: {COLOR_WHITE};
+            color: {COLOR_INK};
             font-weight: 700;
         }}
         .app-subtitle {{
-            color: {COLOR_GRAY_TEXT};
+            color: {COLOR_MUTED};
             font-size: 0.95rem;
             margin-top: -0.6rem;
         }}
-        .app-updated {{
-            color: {COLOR_GRAY_TEXT};
-            font-size: 0.8rem;
-        }}
-        .kpi-card {{
-            background-color: {COLOR_CARD};
-            border-radius: 16px;
-            padding: 1.1rem 1.3rem;
-            box-shadow: 0 0 24px rgba(124, 58, 237, 0.18);
-            border: 1px solid rgba(124, 58, 237, 0.25);
-            height: 100%;
-        }}
-        .kpi-icon {{
-            font-size: 1.4rem;
-        }}
-        .kpi-value {{
-            font-size: 1.7rem;
-            font-weight: 800;
-            color: {COLOR_WHITE};
-            margin: 0.2rem 0 0.1rem 0;
-        }}
-        .kpi-label {{
-            color: {COLOR_GRAY_TEXT};
-            font-size: 0.82rem;
-            font-weight: 500;
-        }}
-        .kpi-dot {{
-            display: inline-block;
-            width: 9px;
-            height: 9px;
-            border-radius: 50%;
-            margin-right: 6px;
-        }}
-        .alert-banner {{
-            background-color: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.35);
-            border-radius: 16px;
-            padding: 0.9rem 1.3rem;
-            margin-bottom: 0.6rem;
-            color: {COLOR_WHITE};
-        }}
         .section-title {{
-            color: {COLOR_WHITE};
+            color: {COLOR_INK};
             font-weight: 600;
             font-size: 1.05rem;
             margin: 0.4rem 0 0.6rem 0;
         }}
+
+        /* --- Stat tiles (KPI row) — no boxes, mixed visual forms --- */
+        .stat-tile {{
+            padding: 0.2rem 0.6rem;
+            height: 100%;
+        }}
+        .stat-top {{
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }}
+        .stat-icon {{
+            font-size: 1.2rem;
+        }}
+        .stat-value {{
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: {COLOR_INK};
+            line-height: 1.15;
+        }}
+        .stat-label {{
+            color: {COLOR_MUTED};
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-top: 0.15rem;
+        }}
+        .stat-accent {{
+            height: 3px;
+            width: 34px;
+            border-radius: 2px;
+            margin: 0.4rem 0 0.35rem 0;
+        }}
+        .meter-track {{
+            background-color: {COLOR_SURFACE};
+            border-radius: 999px;
+            height: 8px;
+            width: 100%;
+            margin-top: 0.5rem;
+            overflow: hidden;
+        }}
+        .meter-fill {{
+            height: 8px;
+            border-radius: 999px;
+        }}
+        .badge-circle {{
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: #FFFFFF;
+            flex-shrink: 0;
+        }}
+        .badge-row {{
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+        }}
+        .badge-caption {{
+            color: {COLOR_MUTED};
+            font-size: 0.78rem;
+            font-weight: 600;
+        }}
+
+        /* --- Alert pills --- */
+        .alert-pill {{
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.4rem 0.9rem;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin: 0 0.5rem 0.5rem 0;
+        }}
+
+        /* --- Chart cards — kept as boxes, restyled to the light theme --- */
         div[data-testid="stPlotlyChart"] {{
-            background-color: {COLOR_CARD};
+            background-color: {COLOR_SURFACE};
             border-radius: 12px;
             padding: 0.6rem;
-            border: 1px solid rgba(124, 58, 237, 0.15);
+            border: 1px solid #E5E7EB;
         }}
         div[data-testid="stExpander"] {{
-            background-color: {COLOR_CARD};
+            background-color: {COLOR_SURFACE};
             border-radius: 16px;
-            border: 1px solid rgba(124, 58, 237, 0.2);
+            border: 1px solid #E5E7EB;
         }}
         div[data-testid="stDataFrame"] {{
             border-radius: 12px;
@@ -192,21 +241,21 @@ def inject_css() -> None:
 
 def plotly_theme(fig: go.Figure, title: str) -> go.Figure:
     fig.update_layout(
-        title=dict(text=title, font=dict(color=COLOR_WHITE, size=15, family="Inter")),
-        paper_bgcolor=COLOR_CARD,
-        plot_bgcolor=COLOR_CARD,
-        font=dict(color=COLOR_WHITE, family="Inter"),
+        title=dict(text=title, font=dict(color=COLOR_INK, size=15, family="Inter")),
+        paper_bgcolor=COLOR_SURFACE,
+        plot_bgcolor=COLOR_SURFACE,
+        font=dict(color=COLOR_INK, family="Inter"),
         colorway=CHART_COLORWAY,
         margin=dict(l=10, r=10, t=50, b=10),
         legend=dict(bgcolor="rgba(0,0,0,0)"),
     )
-    fig.update_xaxes(gridcolor="#262626", zerolinecolor="#262626")
-    fig.update_yaxes(gridcolor="#262626", zerolinecolor="#262626")
+    fig.update_xaxes(gridcolor="#E5E7EB", zerolinecolor="#E5E7EB")
+    fig.update_yaxes(gridcolor="#E5E7EB", zerolinecolor="#E5E7EB")
     return fig
 
 
 # ---------------------------------------------------------------------------
-# UI: header, sidebar, KPIs, alerts
+# UI: header, sidebar
 # ---------------------------------------------------------------------------
 
 
@@ -216,25 +265,25 @@ def render_header() -> None:
         '<div class="app-subtitle">Inventory, supplier, and logistics performance at a glance</div>',
         unsafe_allow_html=True,
     )
-    st.markdown(
-        f'<div class="app-updated">Last updated: {date.today().strftime("%B %d, %Y")}</div>',
-        unsafe_allow_html=True,
-    )
     st.write("")
 
 
 def render_sidebar(df: pd.DataFrame) -> tuple:
     st.sidebar.markdown("### Filters")
-    product_types = st.sidebar.multiselect(
-        "Product type",
-        options=sorted(df["Product type"].unique()),
-        default=sorted(df["Product type"].unique()),
-    )
-    suppliers = st.sidebar.multiselect(
-        "Supplier",
-        options=sorted(df["Supplier name"].unique()),
-        default=sorted(df["Supplier name"].unique()),
-    )
+
+    st.sidebar.markdown("**Product type**")
+    product_types = [
+        pt
+        for pt in sorted(df["Product type"].unique())
+        if st.sidebar.checkbox(pt, value=True, key=f"filter_pt_{pt}")
+    ]
+
+    st.sidebar.markdown("**Supplier**")
+    suppliers = [
+        sup
+        for sup in sorted(df["Supplier name"].unique())
+        if st.sidebar.checkbox(sup, value=True, key=f"filter_sup_{sup}")
+    ]
 
     st.sidebar.markdown("---")
     st.sidebar.markdown("### Dataset stats")
@@ -247,14 +296,56 @@ def render_sidebar(df: pd.DataFrame) -> tuple:
     )
 
 
-def render_kpi_card(col, icon: str, value: str, label: str, color: str) -> None:
+# ---------------------------------------------------------------------------
+# UI: KPI stat tiles (mixed visual forms — meters, a badge, plain stats)
+# ---------------------------------------------------------------------------
+
+
+def render_meter_tile(col, icon: str, display_value: str, label: str, fill_pct: float, color: str) -> None:
+    fill_pct = max(0, min(100, fill_pct))
     with col:
         st.markdown(
             f"""
-            <div class="kpi-card">
-                <span class="kpi-icon">{icon}</span>
-                <div class="kpi-value">{value}</div>
-                <div class="kpi-label"><span class="kpi-dot" style="background-color:{color};"></span>{label}</div>
+            <div class="stat-tile">
+                <div class="stat-top"><span class="stat-icon">{icon}</span></div>
+                <div class="stat-value">{display_value}</div>
+                <div class="stat-label">{label}</div>
+                <div class="meter-track">
+                    <div class="meter-fill" style="width:{fill_pct}%; background-color:{color};"></div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
+def render_plain_tile(col, icon: str, display_value: str, label: str, accent_color: str) -> None:
+    with col:
+        st.markdown(
+            f"""
+            <div class="stat-tile">
+                <div class="stat-top"><span class="stat-icon">{icon}</span></div>
+                <div class="stat-value">{display_value}</div>
+                <div class="stat-accent" style="background-color:{accent_color};"></div>
+                <div class="stat-label">{label}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
+def render_badge_tile(col, count: int, label: str, caption: str, color: str) -> None:
+    with col:
+        st.markdown(
+            f"""
+            <div class="stat-tile">
+                <div class="badge-row">
+                    <div class="badge-circle" style="background-color:{color};">{count}</div>
+                    <div>
+                        <div class="stat-label" style="margin-top:0;">{label}</div>
+                        <div class="badge-caption" style="color:{color};">{caption}</div>
+                    </div>
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -264,52 +355,60 @@ def render_kpi_card(col, icon: str, value: str, label: str, color: str) -> None:
 def render_kpi_row(kpis: dict) -> None:
     cols = st.columns(5)
 
-    render_kpi_card(
+    availability_color = status_color(kpis["availability_rate"], AVAILABILITY_HIGH, AVAILABILITY_LOW)
+    render_meter_tile(
         cols[0],
         "📦",
         f'{kpis["availability_rate"]:.1f}%',
         "Availability Rate",
-        kpi_color(kpis["availability_rate"], AVAILABILITY_HIGH, AVAILABILITY_LOW),
+        kpis["availability_rate"],
+        availability_color,
     )
-    render_kpi_card(
+
+    coverage_color = status_color(
+        kpis["stock_coverage_days"], STOCK_COVERAGE_HIGH_DAYS, STOCK_COVERAGE_LOW_DAYS
+    )
+    render_plain_tile(
         cols[1],
         "🗓️",
         f'{kpis["stock_coverage_days"]:.1f}d',
-        "Stock Coverage",
-        kpi_color(
-            kpis["stock_coverage_days"], STOCK_COVERAGE_HIGH_DAYS, STOCK_COVERAGE_LOW_DAYS
-        ),
+        "Stock Coverage (median)",
+        coverage_color,
     )
-    render_kpi_card(
+
+    stockouts = kpis["stockouts"]
+    stockout_color = COLOR_CRITICAL if stockouts > 0 else COLOR_GOOD
+    render_badge_tile(
         cols[2],
-        "🚨",
-        f'{kpis["stockouts"]}',
+        stockouts,
         "Stockouts",
-        COLOR_RED if kpis["stockouts"] > 0 else COLOR_GREEN,
+        "Action needed" if stockouts > 0 else "All clear",
+        stockout_color,
     )
-    render_kpi_card(
+
+    render_plain_tile(
         cols[3],
         "🚚",
         f'{kpis["avg_lead_time"]:.1f}d',
         "Avg Lead Time",
-        COLOR_VIOLET,
+        COLOR_TEAL,
     )
-    render_kpi_card(
+
+    defect_color = status_color(
+        kpis["avg_defect_rate"], DEFECT_RATE_HIGH_PCT, DEFECT_RATE_LOW_PCT, invert=True
+    )
+    render_meter_tile(
         cols[4],
         "🛠️",
         f'{kpis["avg_defect_rate"]:.2f}%',
         "Avg Defect Rate",
-        kpi_color(
-            kpis["avg_defect_rate"],
-            DEFECT_RATE_HIGH_PCT,
-            DEFECT_RATE_LOW_PCT,
-            invert=True,
-        ),
+        (kpis["avg_defect_rate"] / DEFECT_RATE_METER_MAX) * 100,
+        defect_color,
     )
     st.write("")
 
 
-def render_alert_banner(df: pd.DataFrame, kpis: dict) -> None:
+def render_alert_banner(df: pd.DataFrame) -> None:
     stockout_rows = df[df["Stock levels"] <= STOCKOUT_STOCK_LEVEL]
     low_stock_rows = df[
         (df["Stock levels"] > STOCKOUT_STOCK_LEVEL) & (df["Stock levels"] < LOW_STOCK_THRESHOLD)
@@ -318,21 +417,24 @@ def render_alert_banner(df: pd.DataFrame, kpis: dict) -> None:
     if stockout_rows.empty and low_stock_rows.empty:
         return
 
-    message_parts = []
+    pills = []
     if not stockout_rows.empty:
-        message_parts.append(f"{len(stockout_rows)} SKU(s) out of stock")
+        pills.append(
+            f'<span class="alert-pill" style="background-color:{COLOR_CRITICAL}22; color:{COLOR_CRITICAL};">'
+            f"🚨 {len(stockout_rows)} SKU(s) out of stock</span>"
+        )
     if not low_stock_rows.empty:
-        message_parts.append(f"{len(low_stock_rows)} SKU(s) at low stock (< {LOW_STOCK_THRESHOLD} units)")
+        pills.append(
+            f'<span class="alert-pill" style="background-color:{COLOR_WARNING}22; color:{COLOR_WARNING};">'
+            f"⚠️ {len(low_stock_rows)} SKU(s) low stock (&lt; {LOW_STOCK_THRESHOLD} units)</span>"
+        )
 
-    st.markdown(
-        f'<div class="alert-banner">⚠️ <b>Inventory alert:</b> {" · ".join(message_parts)}</div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown("".join(pills), unsafe_allow_html=True)
     with st.expander("View affected SKUs"):
         affected = pd.concat([stockout_rows, low_stock_rows])[
             ["SKU", "Product type", "Supplier name", "Stock levels", "Availability"]
         ].sort_values("Stock levels")
-        st.dataframe(affected, width='stretch', hide_index=True)
+        st.dataframe(affected, width="stretch", hide_index=True)
 
 
 # ---------------------------------------------------------------------------
@@ -342,13 +444,13 @@ def render_alert_banner(df: pd.DataFrame, kpis: dict) -> None:
 
 def chart_stock_levels_by_sku(df: pd.DataFrame) -> go.Figure:
     top = df.sort_values("Stock levels", ascending=False).head(TOP_N_SKUS_CHART)
-    fig = px.bar(top, x="SKU", y="Stock levels", color_discrete_sequence=[COLOR_VIOLET])
+    fig = px.bar(top, x="SKU", y="Stock levels", color_discrete_sequence=[COLOR_TEAL])
     fig.update_xaxes(categoryorder="total descending")
     return plotly_theme(fig, f"Stock Levels by SKU (Top {TOP_N_SKUS_CHART})")
 
 
 def chart_lead_time_by_supplier(df: pd.DataFrame) -> go.Figure:
-    fig = px.box(df, x="Supplier name", y="Lead times", color="Supplier name")
+    fig = px.box(df, x="Supplier name", y="Lead times", color_discrete_sequence=[COLOR_TEAL])
     fig.update_layout(showlegend=False)
     return plotly_theme(fig, "Lead Time by Supplier")
 
@@ -357,7 +459,7 @@ def chart_defect_rate_by_supplier(df: pd.DataFrame) -> go.Figure:
     grouped = df.groupby("Supplier name", as_index=False)["Defect rates"].mean()
     grouped = grouped.sort_values("Defect rates", ascending=False)
     fig = px.bar(
-        grouped, x="Supplier name", y="Defect rates", color_discrete_sequence=[COLOR_VIOLET]
+        grouped, x="Supplier name", y="Defect rates", color_discrete_sequence=[COLOR_TEAL]
     )
     return plotly_theme(fig, "Defect Rate by Supplier (%)")
 
@@ -381,11 +483,11 @@ def chart_production_vs_sold(df: pd.DataFrame) -> go.Figure:
     fig = go.Figure()
     fig.add_bar(
         x=grouped["Product type"], y=grouped["Production volumes"], name="Produced",
-        marker_color=COLOR_VIOLET,
+        marker_color=COLOR_TEAL,
     )
     fig.add_bar(
         x=grouped["Product type"], y=grouped["Number of products sold"], name="Sold",
-        marker_color=COLOR_VIOLET_SOFT,
+        marker_color=COLOR_MUSTARD,
     )
     fig.update_layout(barmode="group")
     return plotly_theme(fig, "Production vs Sold")
@@ -397,7 +499,7 @@ def chart_shipping_cost_by_carrier(df: pd.DataFrame) -> go.Figure:
         grouped,
         x="Shipping carriers",
         y="Shipping costs",
-        color_discrete_sequence=[COLOR_VIOLET],
+        color_discrete_sequence=[COLOR_TEAL],
     )
     return plotly_theme(fig, "Avg Shipping Cost by Carrier")
 
@@ -409,7 +511,7 @@ def chart_shipping_cost_by_carrier(df: pd.DataFrame) -> go.Figure:
 
 def render_raw_data_explorer(df: pd.DataFrame) -> None:
     with st.expander("Raw data explorer"):
-        st.dataframe(df, width='stretch', hide_index=True)
+        st.dataframe(df, width="stretch", hide_index=True)
         st.download_button(
             "Download filtered data as CSV",
             data=df.to_csv(index=False).encode("utf-8"),
@@ -439,25 +541,25 @@ def main() -> None:
 
     kpis = compute_kpis(df)
     render_kpi_row(kpis)
-    render_alert_banner(df, kpis)
+    render_alert_banner(df)
 
     col1, col2 = st.columns(2)
     with col1:
-        st.plotly_chart(chart_stock_levels_by_sku(df), width='stretch')
+        st.plotly_chart(chart_stock_levels_by_sku(df), use_container_width=True)
     with col2:
-        st.plotly_chart(chart_lead_time_by_supplier(df), width='stretch')
+        st.plotly_chart(chart_lead_time_by_supplier(df), use_container_width=True)
 
     col3, col4 = st.columns(2)
     with col3:
-        st.plotly_chart(chart_defect_rate_by_supplier(df), width='stretch')
+        st.plotly_chart(chart_defect_rate_by_supplier(df), use_container_width=True)
     with col4:
-        st.plotly_chart(chart_revenue_by_category(df), width='stretch')
+        st.plotly_chart(chart_revenue_by_category(df), use_container_width=True)
 
     col5, col6 = st.columns(2)
     with col5:
-        st.plotly_chart(chart_production_vs_sold(df), width='stretch')
+        st.plotly_chart(chart_production_vs_sold(df), use_container_width=True)
     with col6:
-        st.plotly_chart(chart_shipping_cost_by_carrier(df), width='stretch')
+        st.plotly_chart(chart_shipping_cost_by_carrier(df), use_container_width=True)
 
     render_raw_data_explorer(df)
 
